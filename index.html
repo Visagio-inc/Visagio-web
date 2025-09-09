@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Facial Attractiveness Detector</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header>
+    <div class="wrap brand">
+      <img src="assets/logo.png" alt="Logo">
+      <span class="wordmark">Face<span class="dot">Score</span></span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- Upload + Preview -->
+    <div class="card">
+      <h2>Upload / Preview</h2>
+      <div class="content">
+        <div id="dropzone">
+          <p>Drop an image here or select a file</p>
+          <input type="file" id="file" accept="image/*" hidden>
+          <button class="btn accent" onclick="document.getElementById('file').click()">Choose File</button>
+          <button class="btn outline" id="sample1">Demo 1</button>
+          <button class="btn outline" id="sample2">Demo 2</button>
+          <button class="btn outline" id="clear">Clear</button>
+        </div>
+
+        <div class="studio">
+          <div class="stage">
+            <img id="preview" alt="">
+            <canvas id="overlay"></canvas>
+          </div>
+          <div class="meta">
+            <div class="pill"><span class="dot-blue"></span> <span id="modelStatus">Loading models…</span></div>
+            <div class="pill">Faces detected: <span id="detectCount">0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scores -->
+    <div class="card">
+      <h2>Attractiveness Scores</h2>
+      <div class="content">
+        <div class="gauge" id="gauge"><div class="num" id="scoreNum">—</div></div>
+        <div class="subs">
+          <div class="sub"><div class="k">Symmetry</div><div class="v" id="symmetryScore">—</div><div class="bar"><i id="barSym"></i></div></div>
+          <div class="sub"><div class="k">Proportions</div><div class="v" id="propScore">—</div><div class="bar"><i id="barProp"></i></div></div>
+          <div class="sub"><div class="k">Features</div><div class="v" id="featScore">—</div><div class="bar"><i id="barFeat"></i></div></div>
+          <div class="sub"><div class="k">Skin</div><div class="v" id="skinScore">—</div><div class="bar"><i id="barSkin"></i></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Tips -->
+  <div class="card" style="max-width: 1200px; margin: 20px auto;">
+    <h2>Personalized Tips</h2>
+    <div class="content">
+      <div class="tips" id="tipsList"></div>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; <span id="year"></span> FaceScore Project</p>
+  </footer>
+</body>
+</html>
