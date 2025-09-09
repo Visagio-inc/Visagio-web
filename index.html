@@ -1,72 +1,505 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Facial Attractiveness Detector</title>
-  <link rel="stylesheet" href="style.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-  <script defer src="app.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Visagio — Face Aesthetics Analyzer (single-file)</title>
+
+  <!-- face-api.js (specific version) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#ffffff; --ink:#0b0c10; --muted:#6b7280; --accent:#13a8ff; --shadow:0 10px 30px rgba(0,0,0,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial; color:var(--ink); background:var(--bg)}
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    header .brand{display:flex;gap:12px;align-items:center}
+    header .wordmark{font-weight:700;font-size:20px}
+    main{max-width:1100px;margin:18px auto;padding:0 20px}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+    @media(max-width:960px){.grid{grid-template-columns:1fr}}
+    .card{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .card h2{margin:0;padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.06);font-size:18px}
+    .content{padding:16px 18px}
+    #dropzone{border:2px dashed rgba(0,0,0,.12);padding:16px;border-radius:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    #dropzone.drag{border-color:var(--accent)}
+    .btn{padding:8px 12px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:#fff;font-weight:600;cursor:pointer}
+    .btn.outline{background:transparent;color:var(--ink)}
+    .stage{position:relative;background:#fafafa;border-radius:12px;padding:10px;border:1px solid rgba(0,0,0,.04)}
+    .stage img{display:block;max-width:100%;height:auto;border-radius:10px}
+    .overlay{position:absolute;left:10px;right:10px;top:10px;bottom:10px;pointer-events:none}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid rgba(0,0,0,.08);background:#fff;font-size:12px}
+    .dot-blue{width:10px;height:10px;background:var(--accent);border-radius:999px}
+    .meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+    .gauge{--val:0;--size:140px;--thick:14px;width:var(--size);aspect-ratio:1;position:relative;margin-bottom:12px}
+    .gauge::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--val)*1%), rgba(0,0,0,.08) 0);mask:radial-gradient(farthest-side,transparent calc(100% - var(--thick)), #000 calc(100% - var(--thick) + 1px))}
+    .gauge .num{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:28px}
+    .subs{display:grid;grid-template-columns:repeat(1,1fr);gap:10px}
+    .sub{border:1px solid rgba(0,0,0,.06);border-radius:12px;padding:10px;background:#fff}
+    .sub .k{font-size:12px;color:var(--muted)}
+    .sub .v{font-size:16px;font-weight:700;margin-top:4px}
+    .bar{height:10px;background:#f1f1f1;border-radius:999px;overflow:hidden;margin-top:8px}
+    .bar>i{display:block;height:100%;width:0%;background:var(--accent)}
+    .tips{display:grid;gap:10px}
+    .tip{border:1px solid rgba(0,0,0,.08);border-radius:12px;padding:12px;background:#fff}
+    footer{max-width:1100px;margin:32px auto;color:var(--muted);font-size:13px;padding:0 20px}
+    input[type=file]{display:none}
+    /* small helper layout */
+    .cols{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .info{font-size:13px;color:var(--muted)}
+  </style>
 </head>
 <body>
-  <header>
-    <div class="wrap brand">
-      <img src="assets/logo.png" alt="Logo">
-      <span class="wordmark">Face<span class="dot">Score</span></span>
+  <header class="wrap">
+    <div class="brand">
+      <div class="wordmark">Visagio<span style="color:var(--accent)">.</span>app</div>
     </div>
   </header>
 
-  <main class="grid">
-    <!-- Upload + Preview -->
-    <div class="card">
-      <h2>Upload / Preview</h2>
-      <div class="content">
-        <div id="dropzone">
-          <p>Drop an image here or select a file</p>
-          <input type="file" id="file" accept="image/*" hidden>
-          <button class="btn accent" onclick="document.getElementById('file').click()">Choose File</button>
-          <button class="btn outline" id="sample1">Demo 1</button>
-          <button class="btn outline" id="sample2">Demo 2</button>
-          <button class="btn outline" id="clear">Clear</button>
-        </div>
+  <main>
+    <div class="grid">
+      <!-- Left: uploader & preview -->
+      <section class="card">
+        <h2>Studio</h2>
+        <div class="content">
+          <div id="dropzone">
+            <div style="min-width:220px">
+              <strong>Drop a front-facing photo</strong>
+              <div class="info">Well-lit, neutral expression. Or use demo images.</div>
+              <div style="margin-top:8px" class="cols">
+                <button class="btn" id="chooseBtn">Upload</button>
+                <button class="btn outline" id="sample1">Demo 1</button>
+                <button class="btn outline" id="sample2">Demo 2</button>
+                <button class="btn outline" id="clearBtn">Clear</button>
+              </div>
+            </div>
 
-        <div class="studio">
-          <div class="stage">
-            <img id="preview" alt="">
-            <canvas id="overlay"></canvas>
-          </div>
-          <div class="meta">
-            <div class="pill"><span class="dot-blue"></span> <span id="modelStatus">Loading models…</span></div>
-            <div class="pill">Faces detected: <span id="detectCount">0</span></div>
+            <div style="flex:1">
+              <input id="file" type="file" accept="image/*">
+              <div class="stage">
+                <img id="preview" alt="Preview">
+                <canvas id="overlay" class="overlay"></canvas>
+              </div>
+              <div class="meta" style="margin-top:10px">
+                <div class="pill" id="modelStatus"><span class="dot-blue"></span> Loading models…</div>
+                <div class="pill">Detections: <strong id="detectCount">0</strong></div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- Right: results -->
+      <section class="card">
+        <h2>Result</h2>
+        <div class="content">
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+            <div class="gauge" id="gauge"><div class="num" id="scoreNum">—</div></div>
+            <div style="flex:1;min-width:220px">
+              <div style="font-weight:700">Overall Attractiveness</div>
+              <div class="info" style="margin-top:6px">Heuristic score from symmetry, proportions, features and skin evenness. Fun demo, not medical.</div>
+              <div style="margin-top:12px" class="subs">
+                <div class="sub"><div class="k">Symmetry</div><div class="v" id="symmetryScore">—</div><div class="bar"><i id="barSym"></i></div></div>
+                <div class="sub"><div class="k">Proportions</div><div class="v" id="propScore">—</div><div class="bar"><i id="barProp"></i></div></div>
+                <div class="sub"><div class="k">Features</div><div class="v" id="featScore">—</div><div class="bar"><i id="barFeat"></i></div></div>
+                <div class="sub"><div class="k">Skin Evenness</div><div class="v" id="skinScore">—</div><div class="bar"><i id="barSkin"></i></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <!-- Scores -->
-    <div class="card">
-      <h2>Attractiveness Scores</h2>
+    <div style="height:16px"></div>
+
+    <section class="card" style="max-width:1100px;margin:0 auto">
+      <h2>Personalized Tips</h2>
       <div class="content">
-        <div class="gauge" id="gauge"><div class="num" id="scoreNum">—</div></div>
-        <div class="subs">
-          <div class="sub"><div class="k">Symmetry</div><div class="v" id="symmetryScore">—</div><div class="bar"><i id="barSym"></i></div></div>
-          <div class="sub"><div class="k">Proportions</div><div class="v" id="propScore">—</div><div class="bar"><i id="barProp"></i></div></div>
-          <div class="sub"><div class="k">Features</div><div class="v" id="featScore">—</div><div class="bar"><i id="barFeat"></i></div></div>
-          <div class="sub"><div class="k">Skin</div><div class="v" id="skinScore">—</div><div class="bar"><i id="barSkin"></i></div></div>
-        </div>
+        <div class="tips" id="tipsList"></div>
       </div>
-    </div>
+    </section>
   </main>
 
-  <!-- Tips -->
-  <div class="card" style="max-width: 1200px; margin: 20px auto;">
-    <h2>Personalized Tips</h2>
-    <div class="content">
-      <div class="tips" id="tipsList"></div>
-    </div>
-  </div>
-
   <footer>
-    <p>&copy; <span id="year"></span> FaceScore Project</p>
+    <div style="max-width:1100px;margin:0 auto;padding:0 20px">
+      © <span id="year"></span> Visagio — All processing stays on-device by default.
+    </div>
   </footer>
+
+  <script>
+  // Single-file app.js embedded
+
+  // Element refs
+  const els = {
+    preview: document.getElementById('preview'),
+    overlay: document.getElementById('overlay'),
+    detectCount: document.getElementById('detectCount'),
+    gauge: document.getElementById('gauge'),
+    scoreNum: document.getElementById('scoreNum'),
+    symmetryScore: document.getElementById('symmetryScore'),
+    propScore: document.getElementById('propScore'),
+    featScore: document.getElementById('featScore'),
+    skinScore: document.getElementById('skinScore'),
+    bars: {
+      sym: document.getElementById('barSym'),
+      prop: document.getElementById('barProp'),
+      feat: document.getElementById('barFeat'),
+      skin: document.getElementById('barSkin')
+    },
+    tips: document.getElementById('tipsList'),
+    modelStatus: document.getElementById('modelStatus'),
+    file: document.getElementById('file'),
+    chooseBtn: document.getElementById('chooseBtn'),
+    sample1: document.getElementById('sample1'),
+    sample2: document.getElementById('sample2'),
+    clearBtn: document.getElementById('clearBtn'),
+    dropzone: document.getElementById('dropzone')
+  };
+
+  // footer year
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // Resize overlay to match image display size
+  function fitOverlayToImage() {
+    const img = els.preview;
+    const canvas = els.overlay;
+    if (!img.width || !img.height) return;
+    canvas.width = img.clientWidth;
+    canvas.height = img.clientHeight;
+    // position overlay to sit on the image area (already absolutely placed inside .stage)
+  }
+
+  // Helpers
+  function setGauge(val){
+    const v = Math.max(0, Math.min(100, Math.round(val)));
+    els.gauge.style.setProperty('--val', v);
+    els.scoreNum.textContent = v;
+  }
+  function updateBar(key, val){
+    const pct = Math.max(0, Math.min(100, Math.round(val)));
+    els.bars[key].style.width = pct + '%';
+    document.getElementById(key + 'Score').textContent = pct;
+  }
+  function resetUI(){
+    setGauge(0);
+    els.detectCount.textContent = '0';
+    ['sym','prop','feat','skin'].forEach(k=>{
+      els.bars[k].style.width = '0%';
+      document.getElementById(k + 'Score').textContent = '—';
+    });
+    els.tips.innerHTML = '';
+  }
+  function dist(a,b){ return Math.hypot(a.x - b.x, a.y - b.y); }
+
+  // model load promise (call immediately)
+  let modelsReadyPromise = null;
+  modelsReadyPromise = (async function loadModels(){
+    try {
+      // try local /models first (for GitHub Pages you can put model files in /models)
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+        faceapi.nets.faceLandmark68Net.loadFromUri('/models')
+      ]);
+      els.modelStatus.innerHTML = '<span class="dot-blue"></span> Models ready (local)';
+      return true;
+    } catch(e1) {
+      // fallback to CDN weights path(s)
+      try {
+        // try a known jsDelivr GH path (common fallback)
+        const cdn = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+        await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri(cdn),
+          faceapi.nets.faceLandmark68Net.loadFromUri(cdn)
+        ]);
+        els.modelStatus.innerHTML = '<span class="dot-blue"></span> Models ready (CDN)';
+        return true;
+      } catch(e2) {
+        // last fallback (vladmandic distribution)
+        try {
+          const vm = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+          await Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri(vm),
+            faceapi.nets.faceLandmark68Net.loadFromUri(vm)
+          ]);
+          els.modelStatus.innerHTML = '<span class="dot-blue"></span> Models ready (vladmandic CDN)';
+          return true;
+        } catch(e3) {
+          els.modelStatus.innerHTML = '<span class="dot-blue"></span> Failed to load models';
+          console.error('Model load errors:', e1, e2, e3);
+          return false;
+        }
+      }
+    }
+  })();
+
+  // File & drag handlers
+  els.chooseBtn.addEventListener('click', () => els.file.click());
+  els.file.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) loadImageFile(f);
+  });
+
+  // Drag & drop
+  els.dropzone.addEventListener('dragover', e => { e.preventDefault(); els.dropzone.classList.add('drag'); });
+  els.dropzone.addEventListener('dragleave', () => els.dropzone.classList.remove('drag'));
+  els.dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    els.dropzone.classList.remove('drag');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) loadImageFile(f);
+  });
+
+  // Demo & clear
+  els.sample1.addEventListener('click', ()=> loadDemoImage('assets/demo1.jpg'));
+  els.sample2.addEventListener('click', ()=> loadDemoImage('assets/demo2.jpg'));
+  els.clearBtn.addEventListener('click', ()=> { els.preview.src = ''; clearOverlay(); resetUI(); });
+
+  function loadDemoImage(path){
+    els.preview.src = path;
+    els.preview.onload = () => { fitOverlayToImage(); analyzeImage().catch(console.error); };
+    els.preview.onerror = ()=> alert('Demo image not found — place demo images in assets/ or use upload.');
+  }
+
+  function loadImageFile(file){
+    const reader = new FileReader();
+    reader.onload = e => {
+      els.preview.src = e.target.result;
+    };
+    reader.onerror = err => { console.error(err); alert('Failed to read file'); };
+    reader.readAsDataURL(file);
+    els.preview.onload = () => { fitOverlayToImage(); analyzeImage().catch(console.error); };
+  }
+
+  function clearOverlay(){
+    const c = els.overlay;
+    c.width = c.width; // clear
+  }
+
+  // Ensure overlay fits whenever window resizes (keeps canvas display size correct)
+  window.addEventListener('resize', () => {
+    if (els.preview.src && els.preview.complete) {
+      fitOverlayToImage();
+      // re-run analysis at reduced frequency? we'll not auto analyze on resize
+    }
+  });
+
+  // Main analysis: waits for modelsReadyPromise to resolve
+  async function analyzeImage(){
+    if (!els.preview || !els.preview.src) return;
+    // wait for models to finish loading (or fail)
+    const ok = await modelsReadyPromise;
+    if (!ok) {
+      alert('Face models failed to load. Put model files under /models or ensure CDN is reachable.');
+      return;
+    }
+
+    // ensure image fully decoded
+    if (!els.preview.complete) {
+      await new Promise(resolve => { els.preview.onload = resolve; els.preview.onerror = resolve; });
+    }
+
+    fitOverlayToImage();
+    const canvas = els.overlay;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // face-api detection - wrapped in try to avoid throwing
+    let detection = null;
+    try {
+      // detection uses the displayed image element
+      detection = await faceapi.detectSingleFace(els.preview).withFaceLandmarks();
+    } catch (err) {
+      console.error('Detection error:', err);
+      els.modelStatus.textContent = 'Detection error — see console';
+      return;
+    }
+
+    if (!detection) {
+      resetUI();
+      els.modelStatus.innerHTML = '<span class="dot-blue"></span> No face detected — try a straight-on photo';
+      return;
+    }
+
+    els.detectCount.textContent = '1';
+
+    // Resize detection results to display size for drawing and coordinates
+    const resized = faceapi.resizeResults(detection, { width: canvas.width, height: canvas.height });
+
+    // draw landmarks for visual feedback
+    faceapi.draw.drawFaceLandmarks(canvas, resized);
+
+    // landmarks positions (on the displayed coordinate system)
+    const pts = resized.landmarks.positions;
+    const idx = i => pts[i];
+
+    // Basic geometric measures
+    const faceWidth = dist(idx(0), idx(16));
+    const faceHeight = dist(idx(8), idx(27));
+    const leftEyeCenter = (([36,37,38,39]).map(i=>idx(i)).reduce((s,p)=>({x:s.x+p.x,y:s.y+p.y}),{x:0,y:0}));
+    // note: average functions below
+    function avgPtIndices(indices){
+      const ptsA = indices.map(i => idx(i));
+      const x = ptsA.reduce((s,a)=>s+a.x,0)/ptsA.length;
+      const y = ptsA.reduce((s,a)=>s+a.y,0)/ptsA.length;
+      return {x,y};
+    }
+    const leftEye = avgPtIndices([36,37,38,39]);
+    const rightEye = avgPtIndices([42,43,44,45]);
+    const interocular = dist(leftEye, rightEye);
+
+    // --- SYMMETRY ---
+    const mid = idx(27); // approximate vertical midline top-of-nose
+    // pairs of left/right landmark indices chosen to reflect symmetry
+    const pairs = [[36,45],[39,42],[31,35],[48,54],[3,13],[5,11]];
+    let symErrors = 0;
+    pairs.forEach(([l,r]) => {
+      const dl = dist(idx(l), mid);
+      const dr = dist(idx(r), mid);
+      symErrors += Math.abs(dl - dr);
+    });
+    // Normalize asymmetry: smaller error => closer to 1
+    const symNorm = 1 - Math.min(1, (symErrors / pairs.length) / (faceWidth * 0.5));
+    const symmetryScore = Math.round(symNorm * 100);
+
+    // --- PROPORTIONS ---
+    function ratioScore(value, ideal, tol=0.1){
+      const diff = Math.abs(value - ideal);
+      const threshold = tol * Math.max(ideal, 1e-6);
+      return Math.max(0, 1 - diff / threshold);
+    }
+    const faceRatio = faceHeight / faceWidth; // ideal ~1
+    const r_face = ratioScore(faceRatio, 1.0, 0.25);
+    const eyeSpacing = interocular / faceWidth; // ideal ~0.46
+    const r_eyeSpacing = ratioScore(eyeSpacing, 0.46, 0.26);
+    const propScore = Math.round(((r_face + r_eyeSpacing) / 2) * 100);
+
+    // --- FEATURES ---
+    const noseWidthPx = dist(idx(31), idx(35));
+    const mouthWidthPx = dist(idx(48), idx(54));
+    const noseRatio = noseWidthPx / faceWidth;
+    const mouthRatio = mouthWidthPx / faceWidth;
+    const eyeHeightL = (dist(idx(37), idx(41)) + dist(idx(38), idx(40))) / 2;
+    const eyeWidthL = dist(idx(36), idx(39));
+    const eyeHeightR = (dist(idx(43), idx(47)) + dist(idx(44), idx(46))) / 2;
+    const eyeWidthR = dist(idx(42), idx(45));
+    const eyeOpennessL = (eyeHeightL / Math.max(1, eyeWidthL));
+    const eyeOpennessR = (eyeHeightR / Math.max(1, eyeWidthR));
+    const r_nose = ratioScore(noseRatio, 0.22, 0.4);
+    const r_mouth = ratioScore(mouthRatio, 0.34, 0.35);
+    const r_eyeOpen = (ratioScore(eyeOpennessL, 0.3, 0.7) + ratioScore(eyeOpennessR, 0.3, 0.7)) / 2;
+    const featScore = Math.round(((r_nose + r_mouth + r_eyeOpen) / 3) * 100);
+
+    // --- SKIN EVENNESS (brightness variance inside face box) ---
+    const box = resized.detection.box;
+    const skinVar = sampleBrightnessVariance(els.preview, box);
+    // Map variance to 0..100 (lower variance => higher score). tuned factor reduces noise sensitivity
+    const skinScore = Math.max(0, Math.min(100, Math.round(100 - 500 * skinVar)));
+
+    // --- OVERALL WEIGHTED SCORE ---
+    const overall = Math.round(symmetryScore * 0.30 + propScore * 0.30 + featScore * 0.20 + skinScore * 0.20);
+
+    // Update UI
+    setGauge(overall);
+    updateBar('sym', symmetryScore);
+    updateBar('prop', propScore);
+    updateBar('feat', featScore);
+    updateBar('skin', skinScore);
+
+    // centerline visual (overlaid)
+    drawCenterline(mid);
+
+    // Tips
+    renderTips(
+      { symmetryScore, propScore, featScore, skinScore },
+      { faceRatio, eyeSpacing, noseRatio, mouthRatio, eyeOpennessL, eyeOpennessR: eyeOpennessR }
+    );
+  } // end analyzeImage
+
+  // draw centerline helper
+  function drawCenterline(mid){
+    const ctx = els.overlay.getContext('2d');
+    ctx.save();
+    ctx.strokeStyle = '#13a8ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(mid.x, 0);
+    ctx.lineTo(mid.x, els.overlay.height);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // sample brightness variance (maps displayed coords -> natural coords)
+  function sampleBrightnessVariance(imgEl, box){
+    try {
+      // Map box (display coords) -> source image natural coords
+      const sx = Math.max(0, Math.round((box.x / imgEl.clientWidth) * imgEl.naturalWidth));
+      const sy = Math.max(0, Math.round((box.y / imgEl.clientHeight) * imgEl.naturalHeight));
+      const sw = Math.max(1, Math.round((box.width / imgEl.clientWidth) * imgEl.naturalWidth));
+      const sh = Math.max(1, Math.round((box.height / imgEl.clientHeight) * imgEl.naturalHeight));
+
+      const c = document.createElement('canvas');
+      const ctx = c.getContext('2d');
+      // sample to a smaller canvas to limit cost
+      const W = Math.min(160, sw);
+      const H = Math.min(160, sh);
+      c.width = W; c.height = H;
+      ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, W, H);
+      const data = ctx.getImageData(0,0,W,H).data;
+      let sum = 0, sum2 = 0, n = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        // luminance
+        const y = 0.2126 * data[i] + 0.7152 * data[i+1] + 0.0722 * data[i+2];
+        sum += y; sum2 += y * y; n++;
+      }
+      const mean = sum / n;
+      const variance = sum2 / n - mean * mean;
+      return variance / (255 * 255);
+    } catch (e) {
+      console.warn('Skin sampling error', e);
+      return 0.05; // fallback moderate variance
+    }
+  }
+
+  // tips renderer
+  function renderTips(scores, ratios){
+    const tips = [];
+    if (ratios.faceRatio > 1.15) tips.push({t:'Balance a longer face', p:'Add horizontal volume (side) and avoid extra height on top.'});
+    if (ratios.faceRatio < 0.85) tips.push({t:'Elongate a shorter face', p:'Slight height on top, keep sides tighter.'});
+    if (ratios.eyeSpacing < 0.38) tips.push({t:'Close-set eyes', p:'Open inner corners in makeup or choose a central part.'});
+    if (ratios.eyeSpacing > 0.54) tips.push({t:'Wide-set eyes', p:'Use inner-corner definition and brow shaping.'});
+    if (ratios.noseRatio > 0.30) tips.push({t:'Wider nose', p:'Glasses with a defined bridge or hairstyle can refocus attention.'});
+    if (ratios.mouthRatio < 0.26) tips.push({t:'Smaller mouth appearance', p:'Lip hydration/tint and a slight smile can help in photos.'});
+    if (scores.symmetryScore < 70) tips.push({t:'Photo posture for symmetry', p:'Face directly to camera, chin level, even front lighting.'});
+    if (scores.skinScore < 75) tips.push({t:'Even out skin', p:'Cleanse, moisturize, SPF daily. Patch-test new products.'});
+    tips.push({t:'Remember', p:'This is a heuristic demo — confidence, grooming and kindness matter far more.'});
+
+    els.tips.innerHTML = '';
+    tips.slice(0,6).forEach(item => {
+      const d = document.createElement('div');
+      d.className = 'tip';
+      d.innerHTML = `<h4 style="margin:0 0 6px">${item.t}</h4><p style="margin:0;color:var(--muted)">${item.p}</p>`;
+      els.tips.appendChild(d);
+    });
+  }
+
+  // wire a quick click on the <img> to re-analyze
+  els.preview.addEventListener('click', () => {
+    if (els.preview.src) analyzeImage().catch(console.error);
+  });
+
+  // small UX: if user pastes image URL into address bar - try to analyze after load
+  // done via loadImageFile or demo buttons above
+
+  // Initialize UI
+  resetUI();
+
+  // If the user immediately drops an image by dragging onto the page while models still loading,
+  // analyzeImage will wait for modelsReadyPromise before running.
+
+  </script>
 </body>
 </html>
